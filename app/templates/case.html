@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{{ case.title }} · Blocking Session Guardian{% endblock %}
+{% block content %}
+<p><a href="/">All cases</a></p>
+<div class="bar"><h1>#{{ case.id }} {{ case.title }} <span class="badge">{{ case.mode }} mode</span></h1>
+  <div class="actions">
+    <form method="post" action="/cases/{{ case.id }}/advance"><button>Advance 5 minutes</button></form>
+    <form method="post" action="/cases/{{ case.id }}/mode">
+      <input type="hidden" name="mode" value="{{ 'auto' if case.mode == 'approval' else 'approval' }}">
+      <button>Switch to {{ 'auto' if case.mode == 'approval' else 'approval' }} mode</button></form>
+    <form method="post" action="/cases/{{ case.id }}/delete" onsubmit="return confirm('Delete this case?')"><button class="danger">Delete</button></form>
+  </div>
+</div>
+{% if message %}<p class="flash" role="status">{{ message }}</p>{% endif %}
+
+<h2>Blocking chains</h2>
+{% if not cards %}<p class="ok">No blocking sessions remain.</p>{% endif %}
+{% for c in cards %}
+{% set d = c.decision %}
+<section class="card chain {{ d.state }}">
+  <div class="bar">
+    <h3>Root session {{ d.root }} <span class="badge impact-{{ d.impact }}">{{ d.impact }} impact</span>{% if c.chain.cycle %} <span class="badge">circular wait</span>{% endif %}</h3>
+    <span class="state s-{{ d.state }}">
+      {% if d.state == "pending" %}Recommended: {{ c.label }}{% if d.requires_approval %} (approval required){% endif %}
+      {% elif d.state == "waiting" %}Recommended: {{ c.label }}
+      {% elif d.state == "needs_dba" %}Recommended: {{ c.label }}
+      {% else %}Rejected by a human{% endif %}
+    </span>
+  </div>
+  <p class="meta">{{ c.root.user }} · {{ c.root.program }} · {{ c.root.status }} · idle {{ c.root.idle_s }} s · transaction {{ c.root.txn_s }} s · would roll back in about {{ c.root.rollback_s }} s<br>
+    Blocking {{ d.blocked_count }} session{{ "" if d.blocked_count == 1 else "s" }}, longest wait {{ d.max_wait_s }} s, holding {{ c.root.object }}</p>
+  <h4>Why (policy rules)</h4>
+  <ul class="rules">{% for r in d.rules %}<li><b>{{ r.id }}</b> {{ r.text }}</li>{% endfor %}</ul>
+  <div class="actions">
+    {% if d.state == "pending" %}
+      <form method="post" action="/cases/{{ case.id }}/approve/{{ d.root }}" onsubmit="return confirm('End root session {{ d.root }}? (simulated)')"><button class="primary">Approve: end session {{ d.root }}</button></form>
+      <form method="post" action="/cases/{{ case.id }}/reject/{{ d.root }}"><button>Reject</button></form>
+    {% endif %}
+    <form method="post" action="/cases/{{ case.id }}/review/{{ d.root }}"><button{% if not llm_ready %} title="Set ANTHROPIC_API_KEY to enable"{% endif %}>{{ "Review again with AI" if c.review else "Review with AI" }}</button></form>
+  </div>
+  {% if c.review %}
+  <div class="review {{ 'agree' if c.review.agree else 'concern' }}">
+    <b>AI review:</b> {{ "agrees with the policy decision." if c.review.agree else "raised a concern, so a human must confirm." }}
+    {% if c.review.concern %}<br>{{ c.review.concern }}{% endif %}
+    {% if c.review.ticket_update %}<pre class="doc">{{ c.review.ticket_update }}</pre>{% endif %}
+  </div>
+  {% endif %}
+  <details><summary>Sessions waiting behind it ({{ c.members|length }})</summary>
+    <div class="scroll"><table>
+      <thead><tr><th>Session</th><th>User</th><th>Program</th><th>Blocked by</th><th class="num">Waiting (s)</th><th>Level</th></tr></thead>
+      <tbody>{% for m in c.members %}<tr><td>{{ m.sid }}</td><td>{{ m.user }}</td><td>{{ m.program }}</td><td>{{ m.blocking_sid }}</td><td class="num">{{ m.wait_s }}</td><td>{{ m.depth }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </details>
+</section>
+{% endfor %}
+
+<h2>Audit log</h2>
+<ul class="timeline">{% for a in audit|reverse %}<li class="{{ a.who }}"><b>{{ a.at }}</b> [{{ a.who }}] {{ a.text }}</li>{% endfor %}</ul>
+
+<h2>Ticket update (copy into your ticket)</h2>
+<p><a class="button" href="/cases/{{ case.id }}/ticket.txt">Download (.txt)</a></p>
+<pre class="doc">{{ ticket }}</pre>
+
+<details><summary>All sessions ({{ sessions|length }})</summary>
+  <div class="scroll"><table>
+    <thead><tr><th>Session</th><th>User</th><th>Program</th><th>Status</th><th>Blocked by</th><th class="num">Wait (s)</th><th class="num">Idle (s)</th><th class="num">Txn (s)</th></tr></thead>
+    <tbody>{% for s in sessions %}<tr><td>{{ s.sid }}</td><td>{{ s.user }}</td><td>{{ s.program }}</td><td>{{ s.status }}</td><td>{{ s.blocking_sid if s.blocking_sid is not none else "" }}</td><td class="num">{{ s.wait_s }}</td><td class="num">{{ s.idle_s }}</td><td class="num">{{ s.txn_s }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</details>
+{% endblock %}

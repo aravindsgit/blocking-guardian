@@ -1,0 +1,6 @@
+# Keep the style check to correctness rules (unused imports, syntax problems, risky patterns).
+# Stricter rule sets flag FastAPI's normal Depends(...) pattern (B008), so they are not enabled.
+line-length = 120
+
+[lint]
+select = ["E4", "E7", "E9", "F"]

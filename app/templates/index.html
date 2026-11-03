@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Open a blocking-session case</h1>
+<p class="meta">Pick a scenario. The tool finds the blocking chain, applies the safety policy and recommends an action. Every session here is invented.</p>
+<form method="post" action="/cases" class="grid">
+  <div class="field"><label for="scenario">Scenario</label>
+    <select id="scenario" name="scenario">
+      {% for key, s in scenarios.items() %}<option value="{{ key }}"{% if values.get("scenario") == key %} selected{% endif %}>{{ s.title }}</option>{% endfor %}
+    </select>
+    {% if errors.get("scenario") %}<p class="err">{{ errors["scenario"] }}</p>{% endif %}</div>
+  <div class="field"><label for="mode">Mode</label>
+    <select id="mode" name="mode">
+      <option value="approval"{% if values.get("mode") != "auto" %} selected{% endif %}>Approval: a human confirms every action</option>
+      <option value="auto"{% if values.get("mode") == "auto" %} selected{% endif %}>Auto: only low-risk actions run by themselves</option>
+    </select>
+    {% if errors.get("mode") %}<p class="err">{{ errors["mode"] }}</p>{% endif %}</div>
+  <div class="field"><label for="seed">Random seed</label>
+    <input id="seed" name="seed" type="number" value="{{ values.get('seed', '') }}"{% if errors.get("seed") %} aria-invalid="true"{% endif %}>
+    {% if errors.get("seed") %}<p class="err">{{ errors["seed"] }}</p>{% endif %}</div>
+  <div class="field"><button class="primary">Open case</button></div>
+</form>
+<details class="about"><summary>What the scenarios show</summary>
+  <ul>{% for key, s in scenarios.items() %}<li><b>{{ s.title }}:</b> {{ s.about }}</li>{% endfor %}</ul>
+</details>
+<h2>Past cases</h2>
+{% if cases %}
+<div class="scroll"><table>
+  <thead><tr><th>Case</th><th>Scenario</th><th>Mode</th></tr></thead>
+  <tbody>
+  {% for c in cases %}
+    <tr><td><a href="/cases/{{ c.id }}">#{{ c.id }} {{ c.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</a></td><td>{{ c.title }}</td><td>{{ c.mode }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}
+<p class="empty">No cases yet. Pick a scenario above and click Open case.</p>
+{% endif %}
+{% endblock %}
